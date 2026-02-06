@@ -9,7 +9,7 @@ import {
   getLikedBusinesses,
   getSavedBusinesses,
   getBusinessInteractionStatus,
-} from "./business.interactions.controller.js";
+} from "./interactions.controller.js";
 
 const router = express.Router();
 
