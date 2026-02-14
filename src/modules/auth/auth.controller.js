@@ -4,36 +4,58 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { signToken } from "../../utils/jwt.js";
 
+
 /* =====================
    SIGN IN
 ===================== */
+
 export const signin = async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    throw new AppError("Email and password required", 400);
+    return res.status(400).json({
+      success: 0,
+      message: "Email and password required",
+    });
   }
 
+  // Fetch active user by email
   const [rows] = await pool.query(
     "SELECT * FROM users WHERE email=? AND isActive=1",
     [email.toLowerCase()]
   );
 
   if (!rows.length) {
-    throw new AppError("Invalid credentials", 401);
+    return res.status(401).json({
+      success: 0,
+      message: "Invalid credentials",
+    });
   }
 
   const user = rows[0];
+
+  // Verify password
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) {
-    throw new AppError("Invalid credentials", 401);
+    return res.status(401).json({
+      success: 0,
+      message: "Invalid credentials",
+    });
   }
 
+  // Generate 5-digit OTP (or 6-digit if preferred)
+ // const otp = Math.floor(10000 + Math.random() * 90000).toString();
+const otp = '00000';
+  // Set OTP expiry (e.g., 15 minutes from now)
+  const otpExpires = new Date(Date.now() + 1 * 60 * 1000);
+
+  // Update user record with OTP and expiry
   await pool.query(
-    "UPDATE users SET lastLogin=NOW() WHERE id=?",
-    [user.id]
+    "UPDATE users SET otp=?, otpExpires=? WHERE id=?",
+    [otp, otpExpires, user.id]
   );
 
+  // Generate JWT
   const token = signToken(
     {
       id: user.id,
@@ -43,19 +65,19 @@ export const signin = async (req, res) => {
     "1h"
   );
 
+  // Return all user data except password, include OTP for frontend/testing
+  const { password: _, ...userData } = user;
+
   res.json({
     success: 1,
     token,
     expiresIn: 3600,
-    data: {
-      userId: user.userId,
-      name: user.name,
-      email: user.email,
-      member: !!user.member,
-      profileUrl: user.profileUrl,
-    },
+    otp, // send OTP to frontend (in production, send via SMS/email)
+    otpExpires,
+    data: userData,
   });
 };
+
 
 /* =====================
    FORGOT PASSWORD

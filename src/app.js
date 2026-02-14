@@ -60,7 +60,7 @@ app.use("/api/auth", auth );
 // app.use("/api/students", StudentRouter);
 app.use("/api/interactions", interactionsRouter);
 app.use("/api/business", businessRouter);
-app.use("/api/user", userRouter);
+app.use("/api/users", userRouter);
 
 //app.use("/api/student-category", studentCartegoryRouter);
 
