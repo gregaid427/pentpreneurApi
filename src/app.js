@@ -44,9 +44,8 @@ process.on("uncaughtException", (err) => {
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-app.use("/api/uploads/students", express.static(path.join(__dirname, "../uploads/userprofile")));
-app.use("/api/uploads/school", express.static(path.join(__dirname, "../uploads/business")));
-
+app.use("/api/uploads/profiles", express.static(path.join(__dirname, "../uploads/profiles")));
+app.use("/api/uploads/business", express.static(path.join(__dirname, "../uploads/business")));
 
 
 

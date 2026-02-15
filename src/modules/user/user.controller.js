@@ -1,6 +1,65 @@
 import pool from "../../config/db.js";
 import AppError from "../../utils/AppError.js";
 import bcrypt from "bcryptjs";
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Create uploads directory if it doesn't exist
+const uploadsDir = path.join(__dirname, '../../uploads/profiles')
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Configure multer storage
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    // Generate unique filename: userId_timestamp.ext
+    const uniqueName = `${req.params.userId}_${Date.now()}${path.extname(file.originalname)}`;
+    cb(null, uniqueName);
+  }
+});
+
+// File filter - accept only images
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = /jpeg|jpg|png|gif|webp/;
+  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+  const mimetype = allowedTypes.test(file.mimetype);
+
+  if (extname && mimetype) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only image files are allowed (jpeg, jpg, png, gif, webp)'), false);
+  }
+};
+
+// Multer upload configuration
+export const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB max file size
+  },
+  fileFilter: fileFilter,
+});
+
+/**
+ * Upload Profile Image
+ * POST /users/profile/:userId/image
+ */
+
+
+/**
+ * Update User Profile (existing function - enhanced)
+ */
 
 /* =====================
    HELPERS
@@ -501,6 +560,7 @@ export const updateUserProfile = async (req, res) => {
     updates.push("name=?");
     values.push(name.trim());
   }
+
   if (phone) {
     // Check if phone is already taken by another user
     const [existing] = await pool.query(
@@ -513,22 +573,27 @@ export const updateUserProfile = async (req, res) => {
     updates.push("phone=?");
     values.push(phone.trim());
   }
+
   if (country) {
     updates.push("country=?");
     values.push(country.trim());
   }
+
   if (area) {
     updates.push("area=?");
     values.push(area.trim());
   }
+
   if (district) {
     updates.push("district=?");
     values.push(district.trim());
   }
+
   if (localAssembly) {
     updates.push("localAssembly=?");
     values.push(localAssembly.trim());
   }
+
   if (profileUrl !== undefined) {
     updates.push("profileUrl=?");
     values.push(profileUrl);
@@ -576,6 +641,85 @@ export const updateUserProfile = async (req, res) => {
     data: user[0],
   });
 };
+/* =====================
+   UPDATE USER PROFILE
+===================== */
+export const uploadProfileImage = async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    // Check if file was uploaded
+    if (!req.file) {
+      throw new AppError('No image file provided', 400);
+    }
+
+    // Delete old profile image if exists
+    const [currentUser] = await pool.query(
+      'SELECT profileUrl FROM users WHERE userId=?',
+      [userId]
+    );
+
+    if (currentUser.length && currentUser[0].profileUrl) {
+      const oldImagePath = path.join(__dirname, '../../', currentUser[0].profileUrl);
+      if (fs.existsSync(oldImagePath)) {
+        fs.unlinkSync(oldImagePath);
+        console.log('🗑️ Deleted old profile image');
+      }
+    }
+
+    // Generate URL for the uploaded image
+    const profileUrl = `/uploads/profiles/${req.file.filename}`;
+
+    // Update user's profileUrl in database
+    const [result] = await pool.query(
+      'UPDATE users SET profileUrl=? WHERE userId=?',
+      [profileUrl, userId]
+    );
+
+    if (!result.affectedRows) {
+      // Delete uploaded file if user not found
+      fs.unlinkSync(req.file.path);
+      throw new AppError('User not found', 404);
+    }
+
+    // Fetch updated user data
+    const [user] = await pool.query(
+      `SELECT
+        userId,
+        name,
+        email,
+        phone,
+        member,
+        country,
+        area,
+        district,
+        localAssembly,
+        profileUrl,
+        isActive,
+        emailVerified,
+        phoneVerified
+       FROM users
+       WHERE userId=?`,
+      [userId]
+    );
+
+    console.log('✅ Profile image uploaded successfully');
+
+    res.json({
+      error: false,
+      message: 'Profile image uploaded successfully',
+      data: user[0],
+    });
+
+  } catch (error) {
+    // Delete uploaded file if there was an error
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    throw error;
+  }
+};
+
 
 /* =====================
    UPDATE USER (ADMIN)
@@ -750,3 +894,10 @@ export const deleteUser = async (req, res) => {
     data: await fetchUsers(),
   });
 };
+
+
+
+
+
+
+

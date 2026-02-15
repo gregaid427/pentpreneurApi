@@ -17,6 +17,8 @@ import {
   resetUserPassword,
   deleteUser,
   toggleActiveStatus,
+  uploadProfileImage,
+  upload,
 } from "./user.controller.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 
@@ -33,8 +35,11 @@ router.post("/resend-otp", asyncHandler(resendOtp));
    USER ROUTES (REQUIRES AUTH)
    TODO: Add authentication middleware
 ===================== */
+router.post(
+  '/profile/:userId/image',upload.single('image'), // multer middleware
+ uploadProfileImage
+);router.patch("/change-password/:userId", asyncHandler(changePassword));
 router.patch("/profile/:userId", asyncHandler(updateUserProfile));
-router.patch("/change-password/:userId", asyncHandler(changePassword));
 
 /* =====================
    ADMIN ROUTES (REQUIRES ADMIN AUTH)
